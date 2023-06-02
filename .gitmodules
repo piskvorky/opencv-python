@@ -3,7 +3,7 @@
 	url = https://github.com/opencv/opencv.git
 [submodule "opencv_contrib"]
 	path = opencv_contrib
-	url = https://github.com/opencv/opencv_contrib.git
+	url = https://github.com/piskvorky/opencv_contrib
 [submodule "multibuild"]
 	path = multibuild
 	url = https://github.com/multi-build/multibuild.git
