@@ -24,7 +24,7 @@ def main():
     build_rolling = get_build_env_var_by_name("rolling")
 
     install_requires = [
-        "numpy==1.26.4,<2",
+        "numpy>=1.26.4,<2",
     ]
 
     python_version = cmaker.CMaker.get_python_version()
