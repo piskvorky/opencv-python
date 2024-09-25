@@ -17,14 +17,14 @@ def main():
     CI_BUILD = os.environ.get("CI_BUILD", "False")
     is_CI_build = True if CI_BUILD == "1" else False
     cmake_source_dir = "opencv"
-    minimum_supported_numpy = "1.26.0"
+    minimum_supported_numpy = "1.26.4"
     build_contrib = get_build_env_var_by_name("contrib")
     build_headless = get_build_env_var_by_name("headless")
     build_java = "ON" if get_build_env_var_by_name("java") else "OFF"
     build_rolling = get_build_env_var_by_name("rolling")
 
     install_requires = [
-        "numpy>=1.26.0,<2",
+        "numpy==1.26.4,<2",
     ]
 
     python_version = cmaker.CMaker.get_python_version()
