@@ -7,8 +7,7 @@ import subprocess
 import re
 import sysconfig
 import platform
-import skbuild
-from skbuild import cmaker
+from skbuild import cmaker, setup
 
 
 def main():
@@ -102,8 +101,14 @@ def main():
     # Path regexes with forward slashes relative to CMake install dir.
     rearrange_cmake_output_data = {
         "cv2": (
-            [r"bin/opencv_videoio_ffmpeg\d{3}%s\.dll" % ("_64" if is64 else "")]
+            [r"bin/opencv_videoio_ffmpeg\d{4}%s\.dll" % ("_64" if is64 else "")]
             if os.name == "nt"
+            else []
+        )
+        +
+        (
+            [r"lib/libOrbbecSDK.dylib", r"lib/libOrbbecSDK.\d.\d.dylib", r"lib/libOrbbecSDK.\d.\d.\d.dylib"]
+            if platform.system() == "Darwin" and platform.machine() == "arm64"
             else []
         )
         +
@@ -121,7 +126,10 @@ def main():
         +
         [
             r"python/cv2/.*config.*.py"
-        ],
+        ]
+        +
+        [ r"python/cv2/py.typed" ] if sys.version_info >= (3, 6) else []
+        ,
         "cv2.data": [  # OPENCV_OTHER_INSTALL_PATH
             ("etc" if os.name == "nt" else "share/opencv4") + r"/haarcascades/.*\.xml"
         ],
@@ -138,6 +146,9 @@ def main():
             "python/cv2" + r"/utils/.*\.py"
         ],
     }
+
+    if sys.version_info >= (3, 6):
+        rearrange_cmake_output_data["cv2.typing"] = ["python/cv2" + r"/typing/.*\.py"]
 
     # Files in sourcetree outside package dir that should be copied to package.
     # Raw paths relative to sourcetree root.
@@ -245,19 +256,12 @@ def main():
             cmake_args.append("-DWITH_LAPACK=ON")
             cmake_args.append("-DENABLE_PRECOMPILED_HEADERS=OFF")
 
-    # https://github.com/scikit-build/scikit-build/issues/479
-    if "CMAKE_ARGS" in os.environ:
-        import shlex
-
-        cmake_args.extend(shlex.split(os.environ["CMAKE_ARGS"]))
-        del shlex
-
     # works via side effect
     RearrangeCMakeOutput(
         rearrange_cmake_output_data, files_outside_package_dir, package_data.keys()
     )
 
-    skbuild.setup(
+    setup(
         name=package_name,
         version=package_version,
         url="https://github.com/opencv/opencv-python",
@@ -292,6 +296,7 @@ def main():
             "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
             "Programming Language :: Python :: 3.11",
+            "Programming Language :: Python :: 3.12",
             "Programming Language :: C++",
             "Programming Language :: Python :: Implementation :: CPython",
             "Topic :: Scientific/Engineering",
@@ -302,8 +307,9 @@ def main():
         cmake_source_dir=cmake_source_dir,
     )
 
+    print("OpenCV is raising funds to keep the library free for everyone, and we need the support of the entire community to do it. Donate to OpenCV on GitHub:\nhttps://github.com/sponsors/opencv\n")
 
-class RearrangeCMakeOutput(object):
+class RearrangeCMakeOutput:
     """
         Patch SKBuild logic to only take files related to the Python package
         and construct a file hierarchy that SKBuild expects (see below)
@@ -384,7 +390,6 @@ class RearrangeCMakeOutput(object):
             p.replace(os.path.sep, "/") for p in install_relpaths
         ]
         relpaths_zip = list(zip(fslash_install_relpaths, install_relpaths))
-        del install_relpaths, fslash_install_relpaths
 
         final_install_relpaths = []
 
@@ -402,6 +407,19 @@ class RearrangeCMakeOutput(object):
 
         with open(config_py, 'w') as opencv_init_config:
             opencv_init_config.write(custom_init_data)
+
+        if sys.version_info >= (3, 6):
+            for p in install_relpaths:
+                if p.endswith(".pyi"):
+                    target_rel_path = os.path.relpath(p, "python/cv2")
+                    cls._setuptools_wrap._copy_file(
+                        os.path.join(cmake_install_dir, p),
+                        os.path.join(cmake_install_dir, "cv2", target_rel_path),
+                        hide_listing=False,
+                    )
+                    final_install_relpaths.append(os.path.join("cv2", target_rel_path))
+
+        del install_relpaths, fslash_install_relpaths
 
         for package_name, relpaths_re in cls.package_paths_re.items():
             package_dest_reldir = package_name.replace(".", os.path.sep)
